@@ -1,0 +1,51 @@
+{
+  "mcpServers": {
+    "fetch": {
+      "command": "uvx",
+      "args": ["mcp-server-fetch"],
+      "transport": "stdio"
+    },
+    "Home Assistant": {
+      "command": "mcp-proxy",
+      "args": [
+        "http://homeassistant.local:8123/mcp_server/sse"
+      ],
+      "env": {
+        "API_ACCESS_TOKEN": "<YOUR_HOME_ASSISTANT_LONG_LIVED_ACCESS_TOKEN>"
+      },
+      "transport": "stdio"
+    },
+    "brave-search": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-brave-search"],
+      "env": {
+        "BRAVE_API_KEY": "<YOUR_BRAVE_API_KEY>"
+      },
+      "transport": "stdio"
+    },
+    "google-maps": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-google-maps"],
+      "env": {
+        "GOOGLE_MAPS_API_KEY": "<YOUR_GOOGLE_MAPS_API_KEY>"
+      },
+      "transport": "stdio"
+    },
+    "calculate": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@wrtnlabs/calculator-mcp@latest"
+      ],
+      "transport": "stdio"
+    },
+    "weather": {
+      "command": "npx",
+      "args": ["-y", "@timlukahorstmann/mcp-weather"],
+      "env": {
+        "ACCUWEATHER_API_KEY": "<YOUR_ACCUWEATHER_API_KEY>"
+      },
+      "transport": "stdio"
+    }
+  }
+}

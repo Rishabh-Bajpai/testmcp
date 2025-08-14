@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MCP Client Webapp</title>
+    <style>
+        body { font-family: sans-serif; margin: 20px; }
+        .container { display: flex; gap: 20px; }
+        .tools-section, .command-section { flex: 1; border: 1px solid #ccc; padding: 15px; border-radius: 5px; }
+        h2 { margin-top: 0; }
+        ul { list-style-type: none; padding: 0; }
+        li { margin-bottom: 10px; border-bottom: 1px dashed #eee; padding-bottom: 10px; }
+        .tool-name { font-weight: bold; color: #0056b3; cursor: pointer; }
+        .tool-description { font-size: 0.9em; color: #555; margin-top: 5px; }
+        .args-schema { font-family: monospace; background-color: #f0f0f0; padding: 5px; border-radius: 3px; white-space: pre-wrap; word-break: break-all; font-size: 0.8em; display: none; margin-top: 5px; }
+        .args-input { margin-top: 10px; }
+        .args-input label { display: block; margin-bottom: 5px; }
+        .args-input input[type="text"] { width: calc(100% - 10px); padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+        button { padding: 10px 15px; background-color: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 1em; }
+        button:hover { background-color: #218838; }
+        #response { margin-top: 20px; padding: 10px; background-color: #e9ecef; border: 1px solid #dee2e6; border-radius: 5px; white-space: pre-wrap; }
+        .error { color: red; }
+    </style>
+</head>
+<body>
+    <h1>MCP Client Webapp</h1>
+
+    <div class="container">
+        <div class="tools-section">
+            <h2>Select MCP Server</h2>
+            <select id="server-select">
+                <option value="">Loading servers...</option>
+            </select>
+            <h2>Available Tools</h2>
+            <ul id="tools-list">Please select a server.</ul>
+        </div>
+
+        <div class="command-section">
+            <h2>Send Command</h2>
+            <form id="command-form">
+                <label for="selected-tool">Selected Tool:</label>
+                <input type="text" id="selected-tool" readonly>
+                <input type="hidden" id="selected-tool-name">
+                <input type="hidden" id="selected-server-name">
+
+                <div id="args-container" class="args-input">
+                    <!-- Dynamic argument inputs will be added here -->
+                </div>
+
+                <button type="submit">Send Command</button>
+            </form>
+            <h3>Response:</h3>
+            <pre id="response"></pre>
+        </div>
+    </div>
+
+    <script>
+        const serverSelect = document.getElementById('server-select');
+        const toolsList = document.getElementById('tools-list');
+        const selectedToolInput = document.getElementById('selected-tool');
+        const selectedToolNameInput = document.getElementById('selected-tool-name');
+        const selectedServerNameInput = document.getElementById('selected-server-name');
+        const argsContainer = document.getElementById('args-container');
+        const commandForm = document.getElementById('command-form');
+        const responseDiv = document.getElementById('response');
+
+        let availableTools = [];
+
+        async function fetchServers() {
+            try {
+                const res = await fetch('/servers');
+                if (!res.ok) {
+                    throw new Error(`HTTP error! status: ${res.status}`);
+                }
+                const servers = await res.json();
+                serverSelect.innerHTML = '<option value="">--Select a Server--</option>';
+                servers.forEach(server => {
+                    const option = document.createElement('option');
+                    option.value = server;
+                    option.textContent = server;
+                    serverSelect.appendChild(option);
+                });
+            } catch (error) {
+                serverSelect.innerHTML = `<option value="">Error loading servers: ${error.message}</option>`;
+                console.error('Error fetching servers:', error);
+            }
+        }
+
+        async function fetchTools(serverName) {
+            toolsList.innerHTML = 'Loading tools...';
+            availableTools = [];
+            selectedToolInput.value = '';
+            selectedToolNameInput.value = '';
+            argsContainer.innerHTML = '';
+            responseDiv.textContent = '';
+
+            if (!serverName) {
+                toolsList.innerHTML = 'Please select a server.';
+                return;
+            }
+
+            try {
+                const res = await fetch(`/tools?server=${encodeURIComponent(serverName)}`);
+                if (!res.ok) {
+                    throw new Error(`HTTP error! status: ${res.status}`);
+                }
+                availableTools = await res.json();
+                displayTools();
+            } catch (error) {
+                toolsList.innerHTML = `<li class="error">Error loading tools: ${error.message}</li>`;
+                console.error('Error fetching tools:', error);
+            }
+        }
+
+        function displayTools() {
+            toolsList.innerHTML = '';
+            if (availableTools.length === 0) {
+                toolsList.innerHTML = '<li>No tools found for this server.</li>';
+                return;
+            }
+            availableTools.forEach(tool => {
+                const li = document.createElement('li');
+                const toolNameSpan = document.createElement('span');
+                toolNameSpan.className = 'tool-name';
+                toolNameSpan.textContent = tool.name;
+                toolNameSpan.onclick = () => selectTool(tool);
+                li.appendChild(toolNameSpan);
+
+                const toolDescriptionDiv = document.createElement('div');
+                toolDescriptionDiv.className = 'tool-description';
+                toolDescriptionDiv.textContent = tool.description;
+                li.appendChild(toolDescriptionDiv);
+
+                const argsSchemaPre = document.createElement('pre');
+                argsSchemaPre.className = 'args-schema';
+                argsSchemaPre.textContent = JSON.stringify(tool.args_schema, null, 2);
+                li.appendChild(argsSchemaPre);
+
+                // Toggle schema visibility on name click
+                toolNameSpan.addEventListener('click', () => {
+                    argsSchemaPre.style.display = argsSchemaPre.style.display === 'none' ? 'block' : 'none';
+                });
+
+                toolsList.appendChild(li);
+            });
+        }
+
+        function selectTool(tool) {
+            selectedToolInput.value = tool.name;
+            selectedToolNameInput.value = tool.name;
+            argsContainer.innerHTML = ''; // Clear previous arguments
+            responseDiv.textContent = ''; // Clear previous response
+
+            if (tool.args_schema && tool.args_schema.properties) {
+                for (const argName in tool.args_schema.properties) {
+                    const argProps = tool.args_schema.properties[argName];
+                    const label = document.createElement('label');
+                    label.textContent = argName + (tool.args_schema.required && tool.args_schema.required.includes(argName) ? ' (required)' : '');
+                    argsContainer.appendChild(label);
+
+                    const input = document.createElement('input');
+                    input.type = 'text';
+                    input.name = argName;
+                    input.placeholder = argProps.description || argProps.type;
+                    argsContainer.appendChild(input);
+                }
+            } else {
+                argsContainer.innerHTML = '<p>No specific arguments required for this tool.</p>';
+            }
+        }
+
+        commandForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            responseDiv.textContent = 'Sending command...';
+            responseDiv.classList.remove('error');
+
+            const toolName = selectedToolNameInput.value;
+            const serverName = selectedServerNameInput.value; // Get selected server name
+
+            if (!toolName) {
+                responseDiv.textContent = 'Please select a tool first.';
+                responseDiv.classList.add('error');
+                return;
+            }
+            if (!serverName) {
+                responseDiv.textContent = 'Please select a server first.';
+                responseDiv.classList.add('error');
+                return;
+            }
+
+            const args = {};
+            const inputs = argsContainer.querySelectorAll('input[type="text"]');
+            inputs.forEach(input => {
+                if (input.value) {
+                    // Attempt to parse as JSON if it looks like an object/array, otherwise keep as string
+                    try {
+                        const parsedValue = JSON.parse(input.value);
+                        args[input.name] = parsedValue;
+                    } catch (e) {
+                        args[input.name] = input.value;
+                    }
+                }
+            });
+
+            try {
+                const res = await fetch('/send_command', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ server_name: serverName, tool_name: toolName, args: args }),
+                });
+
+                const data = await res.json();
+                if (res.ok) {
+                    // Attempt to parse data.result if it's a string that looks like JSON
+                    try {
+                        const parsedResult = JSON.parse(data.result);
+                        responseDiv.textContent = JSON.stringify(parsedResult, null, 2);
+                    } catch (e) {
+                        // If not valid JSON, display as is
+                        responseDiv.textContent = data.result;
+                    }
+                } else {
+                    responseDiv.textContent = `Error: ${data.error || 'Unknown error'}`;
+                    responseDiv.classList.add('error');
+                }
+            } catch (error) {
+                responseDiv.textContent = `Network error: ${error.message}`;
+                responseDiv.classList.add('error');
+                console.error('Error sending command:', error);
+            }
+        });
+
+        serverSelect.addEventListener('change', (event) => {
+            selectedServerNameInput.value = event.target.value;
+            fetchTools(event.target.value);
+        });
+
+        fetchServers();
+    </script>
+</body>
+</html>

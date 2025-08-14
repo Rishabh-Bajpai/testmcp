@@ -1,0 +1,7 @@
+requests
+python-dotenv
+langchain-mcp-adapters
+langchain-core
+Flask[async]
+PyYAML
+langchain
