@@ -14,8 +14,8 @@ This is a simple web application built with Flask that allows you to interact wi
 ### 1. Clone the Repository
 
 ```bash
-git clone <your-repo-url>
-cd <your-repo-directory>
+git clone [<your-repo-url>](https://github.com/Rishabh-Bajpai/testmcp.git)
+cd testmcp
 ```
 
 ### 2. Install Dependencies
